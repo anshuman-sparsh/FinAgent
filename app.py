@@ -23,7 +23,7 @@ Your core principles are:
 # 1. Imports and Configuration
 st.set_page_config(page_title="FinAgent", layout="wide")
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
