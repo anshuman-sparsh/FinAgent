@@ -83,12 +83,6 @@ if page == "Chat":
             # Clear the file from session state after using it
             del st.session_state.uploaded_file
 
-    if user_input:
-        # Append and display user message
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
-            st.markdown(user_input)
-
         # Generate assistant response using Gemini Pro
         assistant_text = ""
         if not GEMINI_API_KEY:
