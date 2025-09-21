@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import time
-from dotenv import load_dotenv
+from dotenv import load_dotenv  
 import json
 
 # Load environment variables for local development
@@ -67,6 +67,23 @@ def get_chat_response_from_n8n(history):
 
 # --- UI AND APP LOGIC ---
 
+def handle_file_upload():
+    """Callback function to handle automatic file processing when a file is uploaded."""
+    uploaded_file = st.session_state.file_uploader_widget
+    
+    if uploaded_file is not None:
+        with st.spinner("Sending document to the backend for analysis..."):
+            if send_file_to_n8n(uploaded_file):
+                st.success("Document sent! The dashboard will update shortly.")
+                st.session_state.is_processing = True
+                # Store current row count to check for updates
+                df = load_data_from_bin()
+                st.session_state.row_count = len(df)
+                time.sleep(2) # Give a moment before the first poll
+                st.rerun()
+            else:
+                st.error("Failed to send document. Please try again.")
+
 st.set_page_config(page_title="FinAgent", layout="wide")
 
 # Session State Initialization
@@ -82,28 +99,16 @@ with st.sidebar:
     st.header("Upload a Document")
     uploaded_file = st.file_uploader(
         "Upload an invoice, statement, or CSV",
-        type=['png', 'jpg', 'jpeg', 'pdf', 'csv']
+        type=['png', 'jpg', 'jpeg', 'pdf', 'csv'],
+        key="file_uploader_widget",
+        on_change=handle_file_upload
     )
-    
-    if uploaded_file:
-        if st.button("Process Document"):
-            with st.spinner("Sending document to the backend for analysis..."):
-                if send_file_to_n8n(uploaded_file):
-                    st.success("Document sent! The dashboard will update shortly.")
-                    st.session_state.is_processing = True
-                    # Store current row count to check for updates
-                    df = load_data_from_bin()
-                    st.session_state.row_count = len(df)
-                    time.sleep(2) # Give a moment before the first poll
-                    st.rerun()
-                else:
-                    st.error("Failed to send document. Please try again.")
 
 # --- MAIN PAGE LOGIC ---
 
 if page == "Chat":
     st.title("FinAgent Bot 🤖")
-    
+
     # Display chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -118,11 +123,11 @@ if page == "Chat":
         with st.spinner("FinAgent is thinking..."):
             assistant_response = get_chat_response_from_n8n(st.session_state.messages)
             st.session_state.messages.append({"role": "assistant", "content": assistant_response})
-            st.rerun()
+        st.rerun()
 
 elif page == "Dashboard":
     st.title("Your Financial Dashboard 📊")
-    
+
     # Asynchronous polling logic to wait for updates after an upload
     if st.session_state.get("is_processing", False):
         st.info("Backend is processing your document. The dashboard will auto-refresh with new data.")
