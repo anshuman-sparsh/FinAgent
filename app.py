@@ -56,12 +56,22 @@ def send_file_to_n8n(uploaded_file):
         return False
 
 def get_chat_response_from_n8n(history):
-    """Sends chat history to the n8n chat webhook and gets a response."""
+    """Sends ONLY the last user message to the n8n chat webhook."""
     try:
-        payload = {"history": history}
+        # Ensure there is a history to read from
+        if not history:
+            return "No message to send."
+
+        # Extract the content from the very last message in the history
+        last_user_message = history[-1]['content']
+
+        # Create a simple payload with just that message
+        payload = {"user_message": last_user_message}
+        
         response = requests.post(N8N_CHAT_WEBHOOK, json=payload)
         response.raise_for_status()
         return response.json().get("output", "Sorry, I encountered an error.")
+        
     except Exception:
         return "Sorry, I couldn't connect to the bot backend."
 
