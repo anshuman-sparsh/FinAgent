@@ -22,23 +22,15 @@ N8N_CHAT_WEBHOOK = "https://omikun.app.n8n.cloud/webhook/f9a9689e-7288-49e3-a11f
 @st.cache_data(ttl=60) # Cache data for 60 seconds
 def load_data_from_bin():
     """
-    Fetches the latest record from a JSONBin.io bin and returns it as a DataFrame.
+    Fetches data from the n8n GET endpoint and returns it as a DataFrame.
     """
     try:
-        # Get credentials from Streamlit secrets
-        bin_url = st.secrets.get("JSONBIN_URL")
-        access_key = st.secrets.get("JSONBIN_ACCESS_KEY")
-
-        if not bin_url or not access_key:
-            st.error("JSONBin URL or Access Key is not set in secrets.")
-            return pd.DataFrame()
-
-        headers = {'X-Access-Key': access_key}
-        response = requests.get(bin_url, headers=headers)
+        # Fetch data directly from the new n8n endpoint
+        response = requests.get("https://omikun.app.n8n.cloud/webhook/288a5206-4c04-44dc-bc6d-716b07840ca5")
         response.raise_for_status()
 
-        # The actual data is in the 'record' key of the JSONBin response
-        data = response.json().get('record', [])
+        # The endpoint returns a direct JSON array of objects
+        data = response.json()
         
         if not data:
             return pd.DataFrame()
@@ -46,7 +38,7 @@ def load_data_from_bin():
         return pd.DataFrame(data)
 
     except Exception as e:
-        st.error(f"Error loading data from JSONBin: {str(e)}")
+        st.error(f"Error loading data from n8n endpoint: {str(e)}")
         return pd.DataFrame()
 
 def send_file_to_n8n(uploaded_file):
@@ -152,7 +144,12 @@ if st.session_state.page == "Chat":
 
 elif st.session_state.page == "Dashboard":
     st.title("Your Financial Dashboard 📊")
-
+    
+    # Refresh button at the top
+    if st.button('🔄 Refresh Data'):
+        st.cache_data.clear()
+        st.rerun()
+    
     # Show upload status messages
     if hasattr(st.session_state, 'upload_success'):
         if st.session_state.upload_success:
