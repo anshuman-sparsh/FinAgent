@@ -73,7 +73,7 @@ def get_chat_response_from_n8n(history):
         return response.json().get("output", "Sorry, I encountered an error.")
         
     except Exception:
-        return "Sorry, I couldn't connect to the bot backend."
+        return response.json().get("output", "Sorry, I encountered an error.")
 
 # --- UI AND APP LOGIC ---
 
