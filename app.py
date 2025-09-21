@@ -61,7 +61,7 @@ def get_chat_response_from_n8n(history):
         payload = {"history": history}
         response = requests.post(N8N_CHAT_WEBHOOK, json=payload)
         response.raise_for_status()
-        return response.json().get("reply", "Sorry, I encountered an error.")
+        return response.json().get("output", "Sorry, I encountered an error.")
     except Exception:
         return "Sorry, I couldn't connect to the bot backend."
 
