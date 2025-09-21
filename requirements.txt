@@ -7,3 +7,6 @@ Pillow
 PyMuPDF
 tabulate
 requests
+plotly
+seaborn
+matplotlib

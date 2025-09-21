@@ -5,6 +5,9 @@ import requests
 import time
 from dotenv import load_dotenv  
 import json
+import plotly.express as px
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Load environment variables for local development
 load_dotenv()
@@ -149,7 +152,7 @@ if st.session_state.page == "Chat":
 
 elif st.session_state.page == "Dashboard":
     st.title("Your Financial Dashboard 📊")
-    
+
     # Show upload status messages
     if hasattr(st.session_state, 'upload_success'):
         if st.session_state.upload_success:
@@ -189,13 +192,44 @@ elif st.session_state.page == "Dashboard":
             df['Amount'] = pd.to_numeric(df['Amount'])
             df['Date'] = pd.to_datetime(df['Date'])
             
-            st.subheader("Spending by Category")
+            # 1. Pie Chart (Spending Breakdown)
+            st.subheader("Spending Breakdown by Category")
             category_spending = df.groupby('Category')['Amount'].sum()
+            fig_pie = px.pie(values=category_spending.values, names=category_spending.index, title="Spending Breakdown by Category")
+            st.plotly_chart(fig_pie, use_container_width=True)
+            
+            # 2. Bar Chart (Total Spending)
+            st.subheader("Total Spending by Category")
             st.bar_chart(category_spending)
             
-            st.subheader("Spending Over Time")
+            # 3. Line Chart (Spending Over Time)
+            st.subheader("Daily Spending Over Time")
             spending_over_time = df.set_index('Date').resample('D')['Amount'].sum()
             st.line_chart(spending_over_time)
+            
+            # 4. Stacked Bar Chart (Merchant Details)
+            st.subheader("Spending by Merchant within each Category")
+            if 'Merchant' in df.columns:
+                pivot_merchant = df.pivot_table(index='Category', columns='Merchant', values='Amount', aggfunc='sum', fill_value=0)
+                st.bar_chart(pivot_merchant)
+            else:
+                st.info("Merchant data not available for this visualization.")
+            
+            # 5. Heatmap (Monthly Patterns)
+            st.subheader("Monthly Spending Heatmap")
+            df['Month'] = df['Date'].dt.to_period('M').astype(str)
+            pivot_monthly = df.pivot_table(index='Month', columns='Category', values='Amount', aggfunc='sum', fill_value=0)
+            
+            # Create heatmap using seaborn and matplotlib
+            plt.figure(figsize=(12, 8))
+            sns.heatmap(pivot_monthly, annot=True, fmt='.0f', cmap='YlOrRd', cbar_kws={'label': 'Amount'})
+            plt.title('Monthly Spending Heatmap by Category')
+            plt.xlabel('Category')
+            plt.ylabel('Month')
+            plt.xticks(rotation=45)
+            plt.yticks(rotation=0)
+            plt.tight_layout()
+            st.pyplot(plt)
 
         except Exception as e:
             st.error(f"Could not display charts. Error: {e}")
