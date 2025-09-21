@@ -199,10 +199,25 @@ elif st.session_state.page == "Dashboard":
             st.subheader("Total Spending by Category")
             st.bar_chart(category_spending)
             
-            # 3. Line Chart (Spending Over Time)
-            st.subheader("Daily Spending Over Time")
-            spending_over_time = df.set_index('Date').resample('D')['Amount'].sum()
-            st.line_chart(spending_over_time)
+            # 3. Line Chart (Monthly Spending Over Time)
+            st.subheader("Monthly Spending Over Time")
+            
+            # Extract unique years from the Date column and sort them
+            available_years = sorted(df['Date'].dt.year.unique())
+            
+            # Create year selection dropdown
+            selected_year = st.selectbox("Select Year", available_years)
+            
+            # Filter data for the selected year
+            df_filtered = df[df['Date'].dt.year == selected_year]
+            
+            # Check if filtered data is empty
+            if df_filtered.empty:
+                st.warning("No spending data available for the selected year.")
+            else:
+                # Resample by month and sum the Amount
+                monthly_spending = df_filtered.set_index('Date').resample('M')['Amount'].sum()
+                st.line_chart(monthly_spending)
             
             # 4. Stacked Bar Chart (Merchant Details)
             st.subheader("Spending by Merchant within each Category")
