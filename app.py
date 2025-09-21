@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
 from PIL import Image  
+import requests
 
 load_dotenv()
 
