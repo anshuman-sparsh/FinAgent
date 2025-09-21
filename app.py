@@ -12,7 +12,7 @@ load_dotenv()
 # --- CONFIGURATION ---
 # These are the placeholder URLs for Amit's n8n workflows
 N8N_FILE_PROCESSING_WEBHOOK = "https://omikun.app.n8n.cloud/webhook/25e25bf7-7a4d-4016-9091-a03ac3310f0e"
-N8N_CHAT_WEBHOOK = "https://your-n8n-instance/webhook/chat"
+N8N_CHAT_WEBHOOK = "https://omikun.app.n8n.cloud/webhook/46060a5c-8210-4184-b8ea-9067f5013506/chat"
 
 # --- HELPER FUNCTIONS ---
 
