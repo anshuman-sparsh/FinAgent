@@ -49,16 +49,39 @@ with st.sidebar:
 if page == "Chat":
     st.title("FinAgent Bot 🤖")
 
+    # --- NEW FUNCTION TO SEND FILE TO N8N ---
+    def send_file_to_n8n(uploaded_file_data):
+        """Sends the uploaded file to the n8n webhook."""
+        webhook_url = "https://omikun.app.n8n.cloud/webhook/25e25bf7-7a4d-4016-9091-a03ac3310f0e"
+        try:
+            # Prepare the file for the multipart/form-data request
+            files = {
+                'file': (uploaded_file_data.name, uploaded_file_data.getvalue(), uploaded_file_data.type)
+            }
+            response = requests.post(webhook_url, files=files)
+            # Check for a successful response
+            return response.status_code == 200
+        except Exception as e:
+            st.error(f"Failed to send file to backend: {e}")
+            return False
+
     # File uploader and context management in the sidebar
     with st.sidebar:
         st.header("Document Context")
         uploaded_file = st.file_uploader(
             "Upload an invoice, statement, or CSV",
-            type=['png', 'jpg', 'jpeg', 'pdf', 'csv'], # <-- UPDATED FILE TYPES
+            type=['png', 'jpg', 'jpeg', 'pdf', 'csv'],
             help="The bot will remember this document for the whole conversation."
         )
+        
+        # This block now also sends the file to n8n
         if uploaded_file:
             st.session_state.uploaded_file = uploaded_file
+            with st.spinner("Processing your document..."):
+                if send_file_to_n8n(uploaded_file):
+                    st.success("Document sent to backend for analysis!")
+                else:
+                    st.error("Could not send document to backend. Please try again.")
 
         if "uploaded_file" in st.session_state:
             st.info(f"In Context: `{st.session_state.uploaded_file.name}`")
