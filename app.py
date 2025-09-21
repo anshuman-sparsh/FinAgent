@@ -357,6 +357,40 @@ elif st.session_state.page == "Dashboard":
                     st.warning(f"No monthly data available for {selected_year}.")
             else:
                 st.warning("No data available for comparison.")
+            
+            # 7. Average Monthly Spending Habits Summary
+            st.divider()
+            st.subheader("Your Average Monthly Spending Habits")
+            
+            # Calculate total number of unique months
+            unique_months = df['Date'].dt.to_period('M').nunique()
+            
+            # Calculate total spending across all data
+            total_spending = df['Amount'].sum()
+            
+            # Calculate average monthly spend
+            if unique_months > 0:
+                average_monthly_spend = total_spending / unique_months
+                
+                # Display the key metric
+                st.metric(
+                    label="Average Monthly Spend",
+                    value=f"${average_monthly_spend:,.2f}",
+                    help=f"Based on {unique_months} months of data"
+                )
+                
+                # Calculate average spending by category
+                category_totals = df.groupby('Category')['Amount'].sum()
+                category_averages = category_totals / unique_months
+                
+                # Get top 5 categories by average spending
+                top_5_categories = category_averages.nlargest(5)
+                
+                # Display horizontal bar chart
+                st.bar_chart(top_5_categories)
+                st.caption("Top 5 categories by average monthly spending")
+            else:
+                st.warning("Insufficient data to calculate average monthly spending habits.")
 
         except Exception as e:
             st.error(f"Could not display charts. Error: {e}")
