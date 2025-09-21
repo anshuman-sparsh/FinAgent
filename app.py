@@ -3,7 +3,8 @@ import streamlit as st
 import google.generativeai as genai
 import pandas as pd
 import numpy as np
-from dotenv import load_dotenv  
+from dotenv import load_dotenv
+from PIL import Image  
 
 load_dotenv()
 
@@ -48,6 +49,18 @@ with st.sidebar:
 if page == "Chat":
     st.title("FinAgent Bot 🤖")
 
+    # File uploader
+    uploaded_file = st.file_uploader(
+        "Upload an invoice, statement, or CSV",
+        type=['png', 'jpg', 'jpeg', 'pdf', 'csv'],
+        help="Upload images, PDFs, or CSV files to ask questions about their content"
+    )
+    
+    # Store uploaded file in session state
+    if uploaded_file is not None:
+        st.session_state.uploaded_file = uploaded_file
+        st.success("File uploaded! You can now ask questions about it.")
+    
     # Display existing chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -73,18 +86,26 @@ if page == "Chat":
             try:
                 model = genai.GenerativeModel("gemini-1.5-flash-latest")
                 
-                # Prepare the conversation with system prompt
-                conversation = [FINAGENT_SYSTEM_PROMPT]
-                for msg in st.session_state.messages:
-                    if msg["role"] == "user":
-                        conversation.append(f"User: {msg['content']}")
-                    elif msg["role"] == "assistant":
-                        conversation.append(f"Assistant: {msg['content']}")
+                # Check if there's an uploaded file for multimodal conversation
+                if hasattr(st.session_state, 'uploaded_file') and st.session_state.uploaded_file is not None:
+                    # Multimodal conversation with uploaded file
+                    content_list = [st.session_state.uploaded_file, user_input]
+                    response = model.generate_content(content_list)
+                else:
+                    # Text-only conversation
+                    # Prepare the conversation with system prompt
+                    conversation = [FINAGENT_SYSTEM_PROMPT]
+                    for msg in st.session_state.messages:
+                        if msg["role"] == "user":
+                            conversation.append(f"User: {msg['content']}")
+                        elif msg["role"] == "assistant":
+                            conversation.append(f"Assistant: {msg['content']}")
+                    
+                    # Join the conversation into a single prompt
+                    full_prompt = "\n\n".join(conversation)
+                    
+                    response = model.generate_content(full_prompt)
                 
-                # Join the conversation into a single prompt
-                full_prompt = "\n\n".join(conversation)
-                
-                response = model.generate_content(full_prompt)
                 assistant_text = getattr(response, "text", None) or "I'm sorry, I couldn't generate a response right now."
             except Exception as e:
                 assistant_text = f"There was an error contacting the model: {e}"
