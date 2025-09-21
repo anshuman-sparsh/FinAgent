@@ -67,7 +67,21 @@ if page == "Chat":
             st.markdown(message["content"])
 
     # Chat input
-    user_input = st.chat_input("Ask about budgeting, investments, or expenses...")
+    if user_input := st.chat_input("Ask about the document or your finances..."):
+        # Append and display user message
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        with st.chat_message("user"):
+            st.markdown(user_input)
+
+        # Check for an uploaded file and prepare content for the model
+        request_content = [user_input]
+        if "uploaded_file" in st.session_state and st.session_state.uploaded_file is not None:
+            uploaded_file = st.session_state.uploaded_file
+            # Convert the uploaded file to a PIL Image object
+            image = Image.open(uploaded_file)
+            request_content = [image, user_input]
+            # Clear the file from session state after using it
+            del st.session_state.uploaded_file
 
     if user_input:
         # Append and display user message
