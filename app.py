@@ -79,8 +79,14 @@ if page == "Chat":
             uploaded_file = st.session_state.uploaded_file
             # Convert the uploaded file to a PIL Image object
             image = Image.open(uploaded_file)
-            request_content = [image, user_input]
-            # Clear the file from session state after using it
+            # A more specific prompt for multimodal input
+            multimodal_prompt = f"""
+            Analyze the content of the attached financial document (which could be an invoice, receipt, or statement).
+            Based on the document, answer the following question: '{user_input}'
+            """
+            request_content = [image, multimodal_prompt]
+            
+            # Clear the file from session state after using it for this turn
             del st.session_state.uploaded_file
 
         # Generate assistant response using Gemini Pro
