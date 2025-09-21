@@ -49,18 +49,23 @@ with st.sidebar:
 if page == "Chat":
     st.title("FinAgent Bot 🤖")
 
-    # File uploader
-    uploaded_file = st.file_uploader(
-        "Upload an invoice, statement, or CSV",
-        type=['png', 'jpg', 'jpeg', 'pdf', 'csv'],
-        help="Upload images, PDFs, or CSV files to ask questions about their content"
-    )
-    
-    # Store uploaded file in session state
-    if uploaded_file is not None:
-        st.session_state.uploaded_file = uploaded_file
-        st.success("File uploaded! You can now ask questions about it.")
-    
+    # File uploader and context management
+    with st.sidebar:
+        st.header("Document Context")
+        uploaded_file = st.file_uploader(
+            "Upload an invoice or statement",
+            type=['png', 'jpg', 'jpeg'],
+            help="The bot will remember this document for the whole conversation."
+        )
+        if uploaded_file:
+            st.session_state.uploaded_file = uploaded_file
+
+        if "uploaded_file" in st.session_state:
+            st.info(f"In Context: `{st.session_state.uploaded_file.name}`")
+            if st.button("Clear Document Context"):
+                del st.session_state.uploaded_file
+                st.rerun()
+
     # Display existing chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -73,63 +78,37 @@ if page == "Chat":
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        # Check for an uploaded file and prepare content for the model
-        request_content = [user_input]
-        if "uploaded_file" in st.session_state and st.session_state.uploaded_file is not None:
-            uploaded_file = st.session_state.uploaded_file
-            # Convert the uploaded file to a PIL Image object
-            image = Image.open(uploaded_file)
-            # A more specific prompt for multimodal input
-            multimodal_prompt = f"""
-            Analyze the content of the attached financial document (which could be an invoice, receipt, or statement).
-            Based on the document, answer the following question: '{user_input}'
-            """
-            request_content = [image, multimodal_prompt]
+        # *** CORRECTED MERGED-CONTEXT LOGIC ***
+        try:
+            model = genai.GenerativeModel("gemini-1.5-flash-latest")
             
-            # Clear the file from session state after using it for this turn
-            del st.session_state.uploaded_file
+            # Prepare the full conversation history for the API
+            chat_history_for_api = []
+            for msg in st.session_state.messages:
+                role = "model" if msg["role"] == "assistant" else msg["role"]
+                chat_history_for_api.append({'role': role, 'parts': [msg['content']]})
+            
+            # Check if a file is in context and add it to the latest message
+            if "uploaded_file" in st.session_state:
+                image = Image.open(st.session_state.uploaded_file)
+                # Modify the last message to include the image
+                last_user_message = chat_history_for_api[-1]
+                last_user_message['parts'].insert(0, image) # Insert image at the beginning of parts
 
-        # Generate assistant response using Gemini Pro
-        assistant_text = ""
-        if not GEMINI_API_KEY:
-            assistant_text = (
-                "I can't reach the model because GEMINI_API_KEY isn't set. "
-                "Please set the environment variable and reload the app."
-            )
-        else:
-            try:
-                model = genai.GenerativeModel("gemini-1.5-flash-latest")
-                
-                # Check if there's an uploaded file for multimodal conversation
-                if hasattr(st.session_state, 'uploaded_file') and st.session_state.uploaded_file is not None:
-                    # Multimodal conversation with uploaded file
-                    content_list = [st.session_state.uploaded_file, user_input]
-                    response = model.generate_content(content_list)
-                else:
-                    # Text-only conversation
-                    # Prepare the conversation with system prompt
-                    conversation = [FINAGENT_SYSTEM_PROMPT]
-                    for msg in st.session_state.messages:
-                        if msg["role"] == "user":
-                            conversation.append(f"User: {msg['content']}")
-                        elif msg["role"] == "assistant":
-                            conversation.append(f"Assistant: {msg['content']}")
-                    
-                    # Join the conversation into a single prompt
-                    full_prompt = "\n\n".join(conversation)
-                    
-                    response = model.generate_content(full_prompt)
-                
-                assistant_text = getattr(response, "text", None) or "I'm sorry, I couldn't generate a response right now."
-            except Exception as e:
-                assistant_text = f"There was an error contacting the model: {e}"
+            # Start a chat session with the full history
+            chat_session = model.start_chat(history=chat_history_for_api[:-1])
+            
+            # Send the final message (which may contain an image)
+            final_message_parts = chat_history_for_api[-1]['parts']
+            response = chat_session.send_message(final_message_parts)
+            
+            assistant_text = response.text
+
+        except Exception as e:
+            assistant_text = f"An error occurred: {e}"
 
         # Append and display assistant message
         st.session_state.messages.append({"role": "assistant", "content": assistant_text})
-        with st.chat_message("assistant"):
-            st.markdown(assistant_text)
-
-        # Ensure UI updates immediately
         st.rerun()
 
 
