@@ -17,15 +17,34 @@ N8N_CHAT_WEBHOOK = "https://your-n8n-instance/webhook/chat"
 # --- HELPER FUNCTIONS ---
 
 @st.cache_data(ttl=60) # Cache data for 60 seconds
-def load_data_from_google_sheet():
+def load_data_from_bin():
     """
-    This function will be built by Cursor to fetch data from the Google Sheet.
-    For now, it returns an empty DataFrame.
+    Fetches the latest record from a JSONBin.io bin and returns it as a DataFrame.
     """
-    # This is where the logic to read from Google Sheets will go.
-    # We are leaving it empty for now, as per the plan to build the dashboard later.
-    # When built, it should return a pandas DataFrame.
-    return pd.DataFrame()
+    try:
+        # Get credentials from Streamlit secrets
+        bin_url = st.secrets.get("JSONBIN_URL")
+        access_key = st.secrets.get("JSONBIN_ACCESS_KEY")
+
+        if not bin_url or not access_key:
+            st.error("JSONBin URL or Access Key is not set in secrets.")
+            return pd.DataFrame()
+
+        headers = {'X-Access-Key': access_key}
+        response = requests.get(bin_url, headers=headers)
+        response.raise_for_status()
+
+        # The actual data is in the 'record' key of the JSONBin response
+        data = response.json().get('record', [])
+        
+        if not data:
+            return pd.DataFrame()
+        
+        return pd.DataFrame(data)
+
+    except Exception as e:
+        st.error(f"Error loading data from JSONBin: {str(e)}")
+        return pd.DataFrame()
 
 def send_file_to_n8n(uploaded_file):
     """Sends the uploaded file to the n8n processing webhook."""
@@ -73,7 +92,7 @@ with st.sidebar:
                     st.success("Document sent! The dashboard will update shortly.")
                     st.session_state.is_processing = True
                     # Store current row count to check for updates
-                    df = load_data_from_google_sheet()
+                    df = load_data_from_bin()
                     st.session_state.row_count = len(df)
                     time.sleep(2) # Give a moment before the first poll
                     st.rerun()
@@ -111,7 +130,7 @@ elif page == "Dashboard":
         
         with st.spinner("Waiting for data update..."):
             for i in range(10): # Poll up to 10 times (50 seconds)
-                df = load_data_from_google_sheet()
+                df = load_data_from_bin()
                 if len(df) > initial_row_count:
                     st.session_state.is_processing = False
                     st.cache_data.clear() # Clear cache to ensure fresh data
@@ -124,7 +143,7 @@ elif page == "Dashboard":
         st.session_state.is_processing = False
 
     # Display the dashboard
-    transactions_df = load_data_from_google_sheet()
+    transactions_df = load_data_from_bin()
     
     if transactions_df.empty:
         st.info("📊 Your financial insights will appear here once data is available.")
