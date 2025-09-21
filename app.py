@@ -72,17 +72,16 @@ def handle_file_upload():
     uploaded_file = st.session_state.file_uploader_widget
     
     if uploaded_file is not None:
-        with st.spinner("Sending document to the backend for analysis..."):
-            if send_file_to_n8n(uploaded_file):
-                st.success("Document sent! The dashboard will update shortly.")
-                st.session_state.is_processing = True
-                # Store current row count to check for updates
-                df = load_data_from_bin()
-                st.session_state.row_count = len(df)
-                time.sleep(2) # Give a moment before the first poll
-                st.rerun()
-            else:
-                st.error("Failed to send document. Please try again.")
+        if send_file_to_n8n(uploaded_file):
+            st.session_state.is_processing = True
+            st.session_state.upload_success = True
+            # Store current row count to check for updates
+            df = load_data_from_bin()
+            st.session_state.row_count = len(df)
+            # Switch to Dashboard page
+            st.session_state.page = 'Dashboard'
+        else:
+            st.session_state.upload_success = False
 
 st.set_page_config(page_title="FinAgent", layout="wide")
 
@@ -90,10 +89,14 @@ st.set_page_config(page_title="FinAgent", layout="wide")
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Hello! I am FinAgent. How can I help you today?"}]
 
+if 'page' not in st.session_state:
+    st.session_state.page = 'Chat'
+
 # Sidebar for navigation and file uploads
 with st.sidebar:
     st.title("Navigation")
-    page = st.radio("Go to", ["Chat", "Dashboard"], index=0)
+    page = st.radio("Go to", ["Chat", "Dashboard"], index=["Chat", "Dashboard"].index(st.session_state.page), key="radio_go_to")
+    st.session_state.page = page
     st.divider()
     
     st.header("Upload a Document")
@@ -106,7 +109,7 @@ with st.sidebar:
 
 # --- MAIN PAGE LOGIC ---
 
-if page == "Chat":
+if st.session_state.page == "Chat":
     st.title("FinAgent Bot 🤖")
 
     # Display chat history
@@ -125,8 +128,17 @@ if page == "Chat":
             st.session_state.messages.append({"role": "assistant", "content": assistant_response})
         st.rerun()
 
-elif page == "Dashboard":
+elif st.session_state.page == "Dashboard":
     st.title("Your Financial Dashboard 📊")
+    
+    # Show upload status messages
+    if hasattr(st.session_state, 'upload_success'):
+        if st.session_state.upload_success:
+            st.success("Document sent! The dashboard will update shortly.")
+        else:
+            st.error("Failed to send document. Please try again.")
+        # Clear the upload status after showing it
+        del st.session_state.upload_success
 
     # Asynchronous polling logic to wait for updates after an upload
     if st.session_state.get("is_processing", False):
