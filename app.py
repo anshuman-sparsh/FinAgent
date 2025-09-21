@@ -1,180 +1,146 @@
 import os
 import streamlit as st
-import google.generativeai as genai
 import pandas as pd
-import numpy as np
-from dotenv import load_dotenv
-from PIL import Image  
 import requests
+import time
+from dotenv import load_dotenv
+import json
 
+# Load environment variables for local development
 load_dotenv()
 
-# System prompt for FinAgent
-FINAGENT_SYSTEM_PROMPT = """
-You are FinAgent, a friendly and intelligent personal finance co-pilot. Your primary role is to help users understand their finances and achieve their goals based *only* on the transaction data provided to you.
-Your name is FinAgent.
-Your core principles are:
-1.  **Data-Driven:** Base all your answers and analysis strictly on the financial data given. Do not invent or assume any information.
-2.  **Simple and Clear:** Avoid financial jargon. Explain concepts in a simple, easy-to-understand way.
-3.  **Encouraging and Non-Judgmental:** Always maintain a positive and supportive tone. The goal is to empower the user, not to criticize them.
-4.  **Action-Oriented:** Provide practical and actionable tips when asked for advice.
+# --- CONFIGURATION ---
+# These are the placeholder URLs for Amit's n8n workflows
+N8N_FILE_PROCESSING_WEBHOOK = "https://omikun.app.n8n.cloud/webhook/25e25bf7-7a4d-4016-9091-a03ac3310f0e"
+N8N_CHAT_WEBHOOK = "https://your-n8n-instance/webhook/chat"
 
-**CRITICAL SAFETY INSTRUCTION:** You are an AI assistant, NOT a licensed financial advisor. You MUST NOT provide any investment advice, stock recommendations, or financial advice that requires a professional license. If a user asks for such advice, you must politely decline and state that you can only provide analysis based on their past data and for educational purposes.
-"""
+# --- HELPER FUNCTIONS ---
 
-# 1. Imports and Configuration
+@st.cache_data(ttl=60) # Cache data for 60 seconds
+def load_data_from_google_sheet():
+    """
+    This function will be built by Cursor to fetch data from the Google Sheet.
+    For now, it returns an empty DataFrame.
+    """
+    # This is where the logic to read from Google Sheets will go.
+    # We are leaving it empty for now, as per the plan to build the dashboard later.
+    # When built, it should return a pandas DataFrame.
+    return pd.DataFrame()
+
+def send_file_to_n8n(uploaded_file):
+    """Sends the uploaded file to the n8n processing webhook."""
+    try:
+        files = {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+        response = requests.post(N8N_FILE_PROCESSING_WEBHOOK, files=files)
+        return response.status_code == 200
+    except Exception:
+        return False
+
+def get_chat_response_from_n8n(history):
+    """Sends chat history to the n8n chat webhook and gets a response."""
+    try:
+        payload = {"history": history}
+        response = requests.post(N8N_CHAT_WEBHOOK, json=payload)
+        response.raise_for_status()
+        return response.json().get("reply", "Sorry, I encountered an error.")
+    except Exception:
+        return "Sorry, I couldn't connect to the bot backend."
+
+# --- UI AND APP LOGIC ---
+
 st.set_page_config(page_title="FinAgent", layout="wide")
 
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-
-
-# 2. Session State Initialization
+# Session State Initialization
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-            "role": "assistant",
-            "content": "Hello! I am FinAgent, your personal financial co-pilot. How can I help you today?",
-        }
-    ]
+    st.session_state.messages = [{"role": "assistant", "content": "Hello! I am FinAgent. How can I help you today?"}]
 
-
-# 3. Sidebar Navigation
+# Sidebar for navigation and file uploads
 with st.sidebar:
     st.title("Navigation")
     page = st.radio("Go to", ["Chat", "Dashboard"], index=0)
+    st.divider()
+    
+    st.header("Upload a Document")
+    uploaded_file = st.file_uploader(
+        "Upload an invoice, statement, or CSV",
+        type=['png', 'jpg', 'jpeg', 'pdf', 'csv']
+    )
+    
+    if uploaded_file:
+        if st.button("Process Document"):
+            with st.spinner("Sending document to the backend for analysis..."):
+                if send_file_to_n8n(uploaded_file):
+                    st.success("Document sent! The dashboard will update shortly.")
+                    st.session_state.is_processing = True
+                    # Store current row count to check for updates
+                    df = load_data_from_google_sheet()
+                    st.session_state.row_count = len(df)
+                    time.sleep(2) # Give a moment before the first poll
+                    st.rerun()
+                else:
+                    st.error("Failed to send document. Please try again.")
 
+# --- MAIN PAGE LOGIC ---
 
-# 4. Chat Section
 if page == "Chat":
     st.title("FinAgent Bot 🤖")
-
-    # --- NEW FUNCTION TO SEND FILE TO N8N ---
-    def send_file_to_n8n(uploaded_file_data):
-        """Sends the uploaded file to the n8n webhook."""
-        webhook_url = "https://omikun.app.n8n.cloud/webhook/25e25bf7-7a4d-4016-9091-a03ac3310f0e"
-        try:
-            # Prepare the file for the multipart/form-data request
-            files = {
-                'file': (uploaded_file_data.name, uploaded_file_data.getvalue(), uploaded_file_data.type)
-            }
-            response = requests.post(webhook_url, files=files)
-            # Check for a successful response
-            return response.status_code == 200
-        except Exception as e:
-            st.error(f"Failed to send file to backend: {e}")
-            return False
-
-    # File uploader and context management in the sidebar
-    with st.sidebar:
-        st.header("Document Context")
-        uploaded_file = st.file_uploader(
-            "Upload an invoice, statement, or CSV",
-            type=['png', 'jpg', 'jpeg', 'pdf', 'csv'],
-            help="The bot will remember this document for the whole conversation."
-        )
-        
-        # This block now also sends the file to n8n
-        if uploaded_file:
-            st.session_state.uploaded_file = uploaded_file
-            with st.spinner("Processing your document..."):
-                if send_file_to_n8n(uploaded_file):
-                    st.success("Document sent to backend for analysis!")
-                else:
-                    st.error("Could not send document to backend. Please try again.")
-
-        if "uploaded_file" in st.session_state:
-            st.info(f"In Context: `{st.session_state.uploaded_file.name}`")
-            if st.button("Clear Document Context"):
-                del st.session_state.uploaded_file
-                st.rerun()
-
-    # Display existing chat history
+    
+    # Display chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
     # Chat input
-    if user_input := st.chat_input("Ask about the document or your finances..."):
-        # Append and display user message
+    if user_input := st.chat_input("Ask about your finances..."):
         st.session_state.messages.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        try:
-            model = genai.GenerativeModel("gemini-1.5-flash-latest")
-            
-            # Prepare the full conversation history for the API
-            chat_history_for_api = []
-            for msg in st.session_state.messages:
-                role = "model" if msg["role"] == "assistant" else msg["role"]
-                chat_history_for_api.append({'role': role, 'parts': [msg['content']]})
-            
-            # Check if a file is in context and process it based on its type
-            if "uploaded_file" in st.session_state:
-                uploaded_file_data = st.session_state.uploaded_file
-                file_type = uploaded_file_data.type
-                
-                # *** NEW CONDITIONAL LOGIC ***
-                processed_content = None
-                if file_type in ["image/png", "image/jpeg"]:
-                    processed_content = Image.open(uploaded_file_data)
-                elif file_type == "application/pdf":
-                    # Read PDF content
-                    with __import__("fitz").open(stream=uploaded_file_data.read(), filetype="pdf") as doc:
-                        pdf_text = "".join(page.get_text() for page in doc)
-                    processed_content = pdf_text
-                elif file_type == "text/csv":
-                    # Read CSV content
-                    df = pd.read_csv(uploaded_file_data)
-                    processed_content = "Here is the data from the CSV file:\n" + df.to_markdown()
+        with st.spinner("FinAgent is thinking..."):
+            assistant_response = get_chat_response_from_n8n(st.session_state.messages)
+            st.session_state.messages.append({"role": "assistant", "content": assistant_response})
+            st.rerun()
 
-                # Modify the last message to include the processed content
-                if processed_content is not None:
-                    last_user_message = chat_history_for_api[-1]
-                    last_user_message['parts'].insert(0, processed_content)
-
-            # Start a chat session with the full history
-            chat_session = model.start_chat(history=chat_history_for_api[:-1])
-            
-            # Send the final message (which may contain the processed file)
-            final_message_parts = chat_history_for_api[-1]['parts']
-            response = chat_session.send_message(final_message_parts)
-            
-            assistant_text = response.text
-
-        except Exception as e:
-            assistant_text = f"An error occurred: {e}"
-
-        # Append and display assistant message
-        st.session_state.messages.append({"role": "assistant", "content": assistant_text})
-        st.rerun()
-
-
-# 5. Dashboard Section
 elif page == "Dashboard":
     st.title("Your Financial Dashboard 📊")
+    
+    # Asynchronous polling logic to wait for updates after an upload
+    if st.session_state.get("is_processing", False):
+        st.info("Backend is processing your document. The dashboard will auto-refresh with new data.")
+        initial_row_count = st.session_state.get("row_count", 0)
+        
+        with st.spinner("Waiting for data update..."):
+            for i in range(10): # Poll up to 10 times (50 seconds)
+                df = load_data_from_google_sheet()
+                if len(df) > initial_row_count:
+                    st.session_state.is_processing = False
+                    st.cache_data.clear() # Clear cache to ensure fresh data
+                    st.success("Dashboard updated!")
+                    st.rerun()
+                time.sleep(5)
+        
+        # If it's still processing after the loop
+        st.warning("Processing is taking longer than usual. Data may not be up to date.")
+        st.session_state.is_processing = False
 
-    # Chart 1: Monthly Spending by Category (bar chart)
-    spending_df = pd.DataFrame(
-        {
-            "Category": ["Food", "Rent", "Travel", "Utilities", "Entertainment", "Healthcare"],
-            "Amount": [350, 1200, 150, 200, 120, 90],
-        }
-    )
-    st.subheader("Monthly Spending by Category")
-    st.bar_chart(spending_df.set_index("Category"))
+    # Display the dashboard
+    transactions_df = load_data_from_google_sheet()
+    
+    if transactions_df.empty:
+        st.info("📊 Your financial insights will appear here once data is available.")
+    else:
+        try:
+            df = transactions_df.copy()
+            df['Amount'] = pd.to_numeric(df['Amount'])
+            df['Date'] = pd.to_datetime(df['Date'])
+            
+            st.subheader("Spending by Category")
+            category_spending = df.groupby('Category')['Amount'].sum()
+            st.bar_chart(category_spending)
+            
+            st.subheader("Spending Over Time")
+            spending_over_time = df.set_index('Date').resample('D')['Amount'].sum()
+            st.line_chart(spending_over_time)
 
-    # Spacing
-    st.markdown("\n")
-
-    # Chart 2: Savings Over Time (line chart)
-    months = pd.date_range(end=pd.Timestamp.today(), periods=6, freq="M")
-    savings = np.cumsum(np.random.randint(200, 800, size=6))
-    savings_df = pd.DataFrame({"Month": months.strftime("%b %Y"), "Savings": savings})
-    st.subheader("Savings Over Time (Last 6 Months)")
-    st.line_chart(savings_df.set_index("Month"))
-
-
-
+        except Exception as e:
+            st.error(f"Could not display charts. Error: {e}")
