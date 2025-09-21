@@ -49,12 +49,12 @@ with st.sidebar:
 if page == "Chat":
     st.title("FinAgent Bot 🤖")
 
-    # File uploader and context management
+    # File uploader and context management in the sidebar
     with st.sidebar:
         st.header("Document Context")
         uploaded_file = st.file_uploader(
-            "Upload an invoice or statement",
-            type=['png', 'jpg', 'jpeg'],
+            "Upload an invoice, statement, or CSV",
+            type=['png', 'jpg', 'jpeg', 'pdf', 'csv'], # <-- UPDATED FILE TYPES
             help="The bot will remember this document for the whole conversation."
         )
         if uploaded_file:
@@ -78,7 +78,6 @@ if page == "Chat":
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        # *** CORRECTED MERGED-CONTEXT LOGIC ***
         try:
             model = genai.GenerativeModel("gemini-1.5-flash-latest")
             
@@ -88,17 +87,34 @@ if page == "Chat":
                 role = "model" if msg["role"] == "assistant" else msg["role"]
                 chat_history_for_api.append({'role': role, 'parts': [msg['content']]})
             
-            # Check if a file is in context and add it to the latest message
+            # Check if a file is in context and process it based on its type
             if "uploaded_file" in st.session_state:
-                image = Image.open(st.session_state.uploaded_file)
-                # Modify the last message to include the image
-                last_user_message = chat_history_for_api[-1]
-                last_user_message['parts'].insert(0, image) # Insert image at the beginning of parts
+                uploaded_file_data = st.session_state.uploaded_file
+                file_type = uploaded_file_data.type
+                
+                # *** NEW CONDITIONAL LOGIC ***
+                processed_content = None
+                if file_type in ["image/png", "image/jpeg"]:
+                    processed_content = Image.open(uploaded_file_data)
+                elif file_type == "application/pdf":
+                    # Read PDF content
+                    with __import__("fitz").open(stream=uploaded_file_data.read(), filetype="pdf") as doc:
+                        pdf_text = "".join(page.get_text() for page in doc)
+                    processed_content = pdf_text
+                elif file_type == "text/csv":
+                    # Read CSV content
+                    df = pd.read_csv(uploaded_file_data)
+                    processed_content = "Here is the data from the CSV file:\n" + df.to_markdown()
+
+                # Modify the last message to include the processed content
+                if processed_content is not None:
+                    last_user_message = chat_history_for_api[-1]
+                    last_user_message['parts'].insert(0, processed_content)
 
             # Start a chat session with the full history
             chat_session = model.start_chat(history=chat_history_for_api[:-1])
             
-            # Send the final message (which may contain an image)
+            # Send the final message (which may contain the processed file)
             final_message_parts = chat_history_for_api[-1]['parts']
             response = chat_session.send_message(final_message_parts)
             
