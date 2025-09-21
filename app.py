@@ -58,22 +58,31 @@ def send_file_to_n8n(uploaded_file):
 def get_chat_response_from_n8n(history):
     """Sends ONLY the last user message to the n8n chat webhook."""
     try:
-        # Ensure there is a history to read from
         if not history:
             return "No message to send."
 
-        # Extract the content from the very last message in the history
         last_user_message = history[-1]['content']
-
-        # Create a simple payload with just that message
         payload = {"user_message": last_user_message}
         
         response = requests.post(N8N_CHAT_WEBHOOK, json=payload)
         response.raise_for_status()
-        return response.json().get("output", "Sorry, I encountered an error.")
+
+        # *** CORRECTED LOGIC STARTS HERE ***
+        response_data = response.json()
         
-    except Exception:
-        return response.json().get("output", "Sorry, I encountered an error.")
+        # Check if the response is a list and is not empty
+        if isinstance(response_data, list) and response_data:
+            # Get the first dictionary from the list
+            first_item = response_data[0]
+            # Now, get the 'output' key from that dictionary
+            return first_item.get("output", "Sorry, I received a response but couldn't find the message.")
+        else:
+            # Handle cases where the response is not in the expected list format
+            return "Sorry, the backend returned an unexpected data format."
+        
+    except Exception as e:
+        # Added the actual error 'e' to the message for better debugging
+        return f"Sorry, I couldn't connect to the bot backend. Error: {e}"
 
 # --- UI AND APP LOGIC ---
 
