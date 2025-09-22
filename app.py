@@ -81,6 +81,9 @@ def get_chat_response_from_n8n(history):
 
 # --- UI AND APP LOGIC ---
 
+def page_select_callback():
+    st.session_state.page = st.session_state.radio_go_to
+
 def handle_file_upload():
     """Callback function to handle automatic file processing when a file is uploaded."""
     uploaded_file = st.session_state.file_uploader_widget
@@ -109,8 +112,7 @@ if 'page' not in st.session_state:
 # Sidebar for navigation and file uploads
 with st.sidebar:
     st.title("Navigation")
-    page = st.radio("Go to", ["Chat", "Dashboard"], index=["Chat", "Dashboard"].index(st.session_state.page), key="radio_go_to")
-    st.session_state.page = page
+    st.radio("Go to", ["Chat", "Dashboard"], index=["Chat", "Dashboard"].index(st.session_state.page), key="radio_go_to", on_change=page_select_callback)
     st.divider()
     
     st.header("Upload a Document")
