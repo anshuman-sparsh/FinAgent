@@ -191,6 +191,21 @@ elif st.session_state.page == "Dashboard":
             df['Amount'] = pd.to_numeric(df['Amount'])
             df['Date'] = pd.to_datetime(df['Date'])
             
+            # Key Metrics
+            st.header("Key Metrics")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                total_spend = df['Amount'].sum()
+                st.metric(label="Total Spend", value=f"₹{total_spend:,.2f}")
+            with col2:
+                unique_months = df['Date'].dt.to_period('M').nunique()
+                avg_monthly = (total_spend / unique_months) if unique_months > 0 else 0
+                st.metric(label="Average Monthly Spend", value=f"₹{avg_monthly:,.2f}")
+            with col3:
+                total_transactions = len(df)
+                st.metric(label="Total Transactions", value=f"{total_transactions:,}")
+            st.divider()
+            
             # 1. Pie Chart (Spending Breakdown)
             st.subheader("Spending Breakdown by Category")
             category_spending = df.groupby('Category')['Amount'].sum()
