@@ -204,6 +204,23 @@ elif st.session_state.page == "Dashboard":
             with col3:
                 total_transactions = len(df)
                 st.metric(label="Total Transactions", value=f"{total_transactions:,}")
+            
+            # Interactive monthly total metric
+            select_col1, select_col2 = st.columns(2)
+            with select_col1:
+                kpi_years = sorted(df['Date'].dropna().dt.year.astype(int).unique().tolist())
+                selected_kpi_year = st.selectbox("Select Year", kpi_years, key='kpi_year_select')
+                selected_kpi_year = int(selected_kpi_year)
+            with select_col2:
+                all_months_kpi = ['January', 'February', 'March', 'April', 'May', 'June',
+                                  'July', 'August', 'September', 'October', 'November', 'December']
+                selected_kpi_month = st.selectbox("Select Month", all_months_kpi, key='kpi_month_select')
+                selected_kpi_month_num = all_months_kpi.index(selected_kpi_month) + 1
+            
+            kpi_period_df = df[(df['Date'].dt.year == selected_kpi_year) & (df['Date'].dt.month == selected_kpi_month_num)]
+            kpi_period_total = float(kpi_period_df['Amount'].sum()) if not kpi_period_df.empty else 0.0
+            st.metric(label=f"Total Spend for {selected_kpi_month} {selected_kpi_year}", value=f"₹{kpi_period_total:,.2f}")
+            
             st.divider()
             
             # 1. Pie Chart (Spending Breakdown)
@@ -220,7 +237,7 @@ elif st.session_state.page == "Dashboard":
             available_years = sorted(valid_years)
             
             # Create year selection dropdown
-            selected_year = st.selectbox("Select Year", available_years)
+            selected_year = st.selectbox("Select Year", available_years, key='line_chart_year_select')
             selected_year = int(selected_year)
             
             # Filter data for the selected year
@@ -283,7 +300,8 @@ elif st.session_state.page == "Dashboard":
                     selected_year = st.selectbox(
                         "Select Year for Comparison",
                         available_years,
-                        index=available_years.index(default_year) if default_year in available_years else len(available_years) - 1
+                        index=available_years.index(default_year) if default_year in available_years else len(available_years) - 1,
+                        key='mom_year_select'
                     )
                     selected_year = int(selected_year)
                     
@@ -300,19 +318,22 @@ elif st.session_state.page == "Dashboard":
                             default_month1, default_month2 = available_months[-2], available_months[-1]
                         else:
                             default_month1, default_month2 = defaults_in_year[0], defaults_in_year[1]
+                        # Full month list for selection
+                        all_months = [
+                            'January', 'February', 'March', 'April', 'May', 'June',
+                            'July', 'August', 'September', 'October', 'November', 'December'
+                        ]
+                        default_month1_idx = default_month1 - 1
+                        default_month2_idx = default_month2 - 1
                         
-                        month_names = [pd.Timestamp(year=selected_year, month=m, day=1).strftime('%B') for m in available_months]
-                        default_month1_idx = available_months.index(default_month1)
-                        default_month2_idx = available_months.index(default_month2)
-                        
-                        # Month selectors
+                        # Month selectors using full list
                         col1, col2 = st.columns(2)
                         with col1:
-                            selected_month1 = st.selectbox("Month 1", month_names, index=default_month1_idx)
-                            month1_num = available_months[month_names.index(selected_month1)]
+                            selected_month1 = st.selectbox("Month 1", all_months, index=default_month1_idx, key='mom_month1_select')
+                            month1_num = all_months.index(selected_month1) + 1
                         with col2:
-                            selected_month2 = st.selectbox("Month 2", month_names, index=default_month2_idx)
-                            month2_num = available_months[month_names.index(selected_month2)]
+                            selected_month2 = st.selectbox("Month 2", all_months, index=default_month2_idx, key='mom_month2_select')
+                            month2_num = all_months.index(selected_month2) + 1
                         
                         # Filter data for both months
                         month1_data = year_data[year_data['Month'] == month1_num]
@@ -325,10 +346,10 @@ elif st.session_state.page == "Dashboard":
                             if not month1_data.empty:
                                 month1_spending = month1_data.groupby('Category')['Amount'].sum()
                                 fig1 = px.pie(values=month1_spending.values, names=month1_spending.index, 
-                                             title=f"{selected_month1} {selected_year}")
+                                             title=f"Month 1: {selected_month1} {selected_year}")
                                 st.plotly_chart(fig1, use_container_width=True)
                             else:
-                                st.info("No data available")
+                                st.info("No data available for this month")
                         
                         with col2:
                             st.markdown("<div style='text-align: center; font-size: 2em; font-weight: bold; margin-top: 100px;'>Vs.</div>", 
@@ -338,10 +359,10 @@ elif st.session_state.page == "Dashboard":
                             if not month2_data.empty:
                                 month2_spending = month2_data.groupby('Category')['Amount'].sum()
                                 fig2 = px.pie(values=month2_spending.values, names=month2_spending.index, 
-                                             title=f"{selected_month2} {selected_year}")
+                                             title=f"Month 2: {selected_month2} {selected_year}")
                                 st.plotly_chart(fig2, use_container_width=True)
                             else:
-                                st.info("No data available")
+                                st.info("No data available for this month")
                         
                         # Calculate and display statistical summary
                         if not month1_data.empty and not month2_data.empty:
