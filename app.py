@@ -221,6 +221,7 @@ elif st.session_state.page == "Dashboard":
             
             # Create year selection dropdown
             selected_year = st.selectbox("Select Year", available_years)
+            selected_year = int(selected_year)
             
             # Filter data for the selected year
             df_filtered = df[df['Date'].dt.year == selected_year]
@@ -265,6 +266,7 @@ elif st.session_state.page == "Dashboard":
             if default_year:
                 # Year selection
                 selected_year = st.selectbox("Select Year for Comparison", available_years, index=available_years.index(default_year))
+                selected_year = int(selected_year)
                 
                 # Get available months for selected year
                 year_data = df[df['Date'].dt.year == selected_year]
