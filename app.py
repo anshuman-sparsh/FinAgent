@@ -236,7 +236,8 @@ elif st.session_state.page == "Dashboard":
             
             # 3. Bar Chart (Total Spending)
             st.subheader("Total Spending by Category")
-            st.bar_chart(category_spending)
+            top_10_spending = category_spending.nlargest(10)
+            st.bar_chart(top_10_spending)
             
             
             # 5. Heatmap (Monthly Patterns)
@@ -259,117 +260,132 @@ elif st.session_state.page == "Dashboard":
             st.divider()
             st.subheader("Month-over-Month Spending Comparison")
             
-            # Get available years and set default to most recent
-            available_years = sorted(df['Date'].dt.year.unique())
-            default_year = available_years[-1] if available_years else None
+            # Clean data and ensure integer years
+            df_mom = df.dropna(subset=['Date']).copy()
+            df_mom['Date'] = pd.to_datetime(df_mom['Date'])
+            df_mom['Year'] = df_mom['Date'].dt.year.astype(int)
+            df_mom['Month'] = df_mom['Date'].dt.month.astype(int)
             
-            if default_year:
-                # Year selection
-                selected_year = st.selectbox("Select Year for Comparison", available_years, index=available_years.index(default_year))
-                selected_year = int(selected_year)
-                
-                # Get available months for selected year
-                year_data = df[df['Date'].dt.year == selected_year]
-                available_months = sorted(year_data['Date'].dt.month.unique())
-                month_names = [pd.Timestamp(year=selected_year, month=month, day=1).strftime('%B') for month in available_months]
-                
-                if len(available_months) >= 2:
-                    # Default to most recent and second most recent months
-                    default_month1 = available_months[-2]
-                    default_month2 = available_months[-1]
-                    
-                    # Create two columns for month selection
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        month1_idx = available_months.index(default_month1)
-                        selected_month1 = st.selectbox("Month 1", month_names, index=month1_idx)
-                        month1_num = available_months[month_names.index(selected_month1)]
-                    
-                    with col2:
-                        month2_idx = available_months.index(default_month2)
-                        selected_month2 = st.selectbox("Month 2", month_names, index=month2_idx)
-                        month2_num = available_months[month_names.index(selected_month2)]
-                    
-                    # Filter data for both months
-                    month1_data = year_data[year_data['Date'].dt.month == month1_num]
-                    month2_data = year_data[year_data['Date'].dt.month == month2_num]
-                    
-                    # Create side-by-side pie charts
-                    col1, col2, col3 = st.columns([2, 1, 2])
-                    
-                    with col1:
-                        if not month1_data.empty:
-                            month1_spending = month1_data.groupby('Category')['Amount'].sum()
-                            fig1 = px.pie(values=month1_spending.values, names=month1_spending.index, 
-                                         title=f"{selected_month1} {selected_year}")
-                            st.plotly_chart(fig1, use_container_width=True)
-                        else:
-                            st.info("No data available")
-                    
-                    with col2:
-                        st.markdown("<div style='text-align: center; font-size: 2em; font-weight: bold; margin-top: 100px;'>Vs.</div>", 
-                                  unsafe_allow_html=True)
-                    
-                    with col3:
-                        if not month2_data.empty:
-                            month2_spending = month2_data.groupby('Category')['Amount'].sum()
-                            fig2 = px.pie(values=month2_spending.values, names=month2_spending.index, 
-                                         title=f"{selected_month2} {selected_year}")
-                            st.plotly_chart(fig2, use_container_width=True)
-                        else:
-                            st.info("No data available")
-                    
-                    # Calculate and display statistical summary
-                    if not month1_data.empty and not month2_data.empty:
-                        total_month1 = month1_data['Amount'].sum()
-                        total_month2 = month2_data['Amount'].sum()
-                        
-                        # Calculate percentage difference
-                        if total_month1 > 0:
-                            pct_change = ((total_month2 - total_month1) / total_month1) * 100
-                        else:
-                            pct_change = 100 if total_month2 > 0 else 0
-                        
-                        # Display metric
-                        st.metric(
-                            label=f"Total Spending Change ({selected_month1} → {selected_month2})",
-                            value=f"₹{total_month2:,.2f}",
-                            delta=f"{pct_change:+.1f}%"
-                        )
-                        
-                        # Category-wise comparison
-                        month1_cat = month1_data.groupby('Category')['Amount'].sum()
-                        month2_cat = month2_data.groupby('Category')['Amount'].sum()
-                        
-                        # Calculate differences
-                        all_categories = set(month1_cat.index) | set(month2_cat.index)
-                        category_changes = {}
-                        
-                        for cat in all_categories:
-                            amount1 = month1_cat.get(cat, 0)
-                            amount2 = month2_cat.get(cat, 0)
-                            change = amount2 - amount1
-                            category_changes[cat] = change
-                        
-                        # Find biggest increase and decrease
-                        if category_changes:
-                            biggest_increase = max(category_changes.items(), key=lambda x: x[1])
-                            biggest_decrease = min(category_changes.items(), key=lambda x: x[1])
-                            
-                            summary_text = f"""
-                            **Category Analysis:**
-                            - **Biggest Increase:** {biggest_increase[0]} (₹{biggest_increase[1]:+,.2f})
-                            - **Biggest Decrease:** {biggest_decrease[0]} (₹{biggest_decrease[1]:+,.2f})
-                            """
-                            st.markdown(summary_text)
-                
-                elif len(available_months) == 1:
-                    st.warning(f"Only one month of data available for {selected_year}. Cannot perform month-over-month comparison.")
-                else:
-                    st.warning(f"No monthly data available for {selected_year}.")
-            else:
+            available_years = sorted(df_mom['Year'].unique().tolist())
+            if not available_years:
                 st.warning("No data available for comparison.")
+            else:
+                # Determine two most recent unique months across entire dataset
+                unique_periods = sorted(df_mom['Date'].dt.to_period('M').unique())
+                if len(unique_periods) < 2:
+                    st.warning("Not enough monthly data available to compare.")
+                else:
+                    last_period = unique_periods[-1]
+                    prev_period = unique_periods[-2]
+                    default_year = int(last_period.year)
+                    
+                    # Year selection with clean integer options
+                    selected_year = st.selectbox(
+                        "Select Year for Comparison",
+                        available_years,
+                        index=available_years.index(default_year) if default_year in available_years else len(available_years) - 1
+                    )
+                    selected_year = int(selected_year)
+                    
+                    # Months available within selected year
+                    year_data = df_mom[df_mom['Year'] == selected_year]
+                    available_months = sorted(year_data['Month'].unique().tolist())
+                    if len(available_months) < 2:
+                        st.warning(f"Not enough monthly data available for {selected_year} to compare.")
+                    else:
+                        # Determine default months within selected year
+                        defaults_in_year = [p.month for p in [prev_period, last_period] if int(p.year) == selected_year]
+                        if len(defaults_in_year) < 2:
+                            # Fallback to last two months available in the selected year
+                            default_month1, default_month2 = available_months[-2], available_months[-1]
+                        else:
+                            default_month1, default_month2 = defaults_in_year[0], defaults_in_year[1]
+                        
+                        month_names = [pd.Timestamp(year=selected_year, month=m, day=1).strftime('%B') for m in available_months]
+                        default_month1_idx = available_months.index(default_month1)
+                        default_month2_idx = available_months.index(default_month2)
+                        
+                        # Month selectors
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            selected_month1 = st.selectbox("Month 1", month_names, index=default_month1_idx)
+                            month1_num = available_months[month_names.index(selected_month1)]
+                        with col2:
+                            selected_month2 = st.selectbox("Month 2", month_names, index=default_month2_idx)
+                            month2_num = available_months[month_names.index(selected_month2)]
+                        
+                        # Filter data for both months
+                        month1_data = year_data[year_data['Month'] == month1_num]
+                        month2_data = year_data[year_data['Month'] == month2_num]
+                        
+                        # Create side-by-side pie charts
+                        col1, col2, col3 = st.columns([2, 1, 2])
+                        
+                        with col1:
+                            if not month1_data.empty:
+                                month1_spending = month1_data.groupby('Category')['Amount'].sum()
+                                fig1 = px.pie(values=month1_spending.values, names=month1_spending.index, 
+                                             title=f"{selected_month1} {selected_year}")
+                                st.plotly_chart(fig1, use_container_width=True)
+                            else:
+                                st.info("No data available")
+                        
+                        with col2:
+                            st.markdown("<div style='text-align: center; font-size: 2em; font-weight: bold; margin-top: 100px;'>Vs.</div>", 
+                                      unsafe_allow_html=True)
+                        
+                        with col3:
+                            if not month2_data.empty:
+                                month2_spending = month2_data.groupby('Category')['Amount'].sum()
+                                fig2 = px.pie(values=month2_spending.values, names=month2_spending.index, 
+                                             title=f"{selected_month2} {selected_year}")
+                                st.plotly_chart(fig2, use_container_width=True)
+                            else:
+                                st.info("No data available")
+                        
+                        # Calculate and display statistical summary
+                        if not month1_data.empty and not month2_data.empty:
+                            total_month1 = month1_data['Amount'].sum()
+                            total_month2 = month2_data['Amount'].sum()
+                            
+                            # Calculate percentage difference
+                            if total_month1 > 0:
+                                pct_change = ((total_month2 - total_month1) / total_month1) * 100
+                            else:
+                                pct_change = 100 if total_month2 > 0 else 0
+                            
+                            # Display metric
+                            st.metric(
+                                label=f"Total Spending Change ({selected_month1} → {selected_month2})",
+                                value=f"₹{total_month2:,.2f}",
+                                delta=f"{pct_change:+.1f}%"
+                            )
+                            
+                            # Category-wise comparison
+                            month1_cat = month1_data.groupby('Category')['Amount'].sum()
+                            month2_cat = month2_data.groupby('Category')['Amount'].sum()
+                            
+                            # Calculate differences
+                            all_categories = set(month1_cat.index) | set(month2_cat.index)
+                            category_changes = {}
+                            
+                            for cat in all_categories:
+                                amount1 = month1_cat.get(cat, 0)
+                                amount2 = month2_cat.get(cat, 0)
+                                change = amount2 - amount1
+                                category_changes[cat] = change
+                            
+                            # Find biggest increase and decrease
+                            if category_changes:
+                                biggest_increase = max(category_changes.items(), key=lambda x: x[1])
+                                biggest_decrease = min(category_changes.items(), key=lambda x: x[1])
+                                
+                                summary_text = f"""
+                                **Category Analysis:**
+                                - **Biggest Increase:** {biggest_increase[0]} (₹{biggest_increase[1]:+,.2f})
+                                - **Biggest Decrease:** {biggest_decrease[0]} (₹{biggest_decrease[1]:+,.2f})
+                                """
+                                st.markdown(summary_text)
             
             # 7. Average Monthly Spending Habits Summary
             st.divider()
