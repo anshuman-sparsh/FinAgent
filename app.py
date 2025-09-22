@@ -216,7 +216,8 @@ elif st.session_state.page == "Dashboard":
             st.subheader("Monthly Spending Over Time")
             
             # Extract unique years from the Date column and sort them
-            available_years = sorted(df['Date'].dt.year.unique())
+            valid_years = df['Date'].dropna().dt.year.astype(int).unique()
+            available_years = sorted(valid_years)
             
             # Create year selection dropdown
             selected_year = st.selectbox("Select Year", available_years)
