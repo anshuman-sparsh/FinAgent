@@ -101,7 +101,7 @@ st.set_page_config(page_title="FinAgent", layout="wide")
 
 # Session State Initialization
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hello! I am FinAgent. How can I help you today?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hy! I am FinAgent. Your personal financial Manager. How can I help you today?"}]
 
 if 'page' not in st.session_state:
     st.session_state.page = 'Chat'
@@ -195,11 +195,7 @@ elif st.session_state.page == "Dashboard":
             fig_pie = px.pie(values=category_spending.values, names=category_spending.index, title="Spending Breakdown by Category")
             st.plotly_chart(fig_pie, use_container_width=True)
             
-            # 2. Bar Chart (Total Spending)
-            st.subheader("Total Spending by Category")
-            st.bar_chart(category_spending)
-            
-            # 3. Line Chart (Monthly Spending Over Time)
+            # 2. Line Chart (Monthly Spending Over Time)
             st.subheader("Monthly Spending Over Time")
             
             # Extract unique years from the Date column and sort them
@@ -219,13 +215,10 @@ elif st.session_state.page == "Dashboard":
                 monthly_spending = df_filtered.set_index('Date').resample('M')['Amount'].sum()
                 st.line_chart(monthly_spending)
             
-            # 4. Stacked Bar Chart (Merchant Details)
-            st.subheader("Spending by Merchant within each Category")
-            if 'Merchant' in df.columns:
-                pivot_merchant = df.pivot_table(index='Category', columns='Merchant', values='Amount', aggfunc='sum', fill_value=0)
-                st.bar_chart(pivot_merchant)
-            else:
-                st.info("Merchant data not available for this visualization.")
+            # 3. Bar Chart (Total Spending)
+            st.subheader("Total Spending by Category")
+            st.bar_chart(category_spending)
+            
             
             # 5. Heatmap (Monthly Patterns)
             st.subheader("Monthly Spending Heatmap")
