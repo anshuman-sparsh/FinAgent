@@ -257,21 +257,35 @@ elif st.session_state.page == "Dashboard":
             st.bar_chart(top_10_spending)
             
             
-            # 5. Heatmap (Monthly Patterns)
-            st.subheader("Monthly Spending Heatmap")
-            df['Month'] = df['Date'].dt.to_period('M').astype(str)
-            pivot_monthly = df.pivot_table(index='Month', columns='Category', values='Amount', aggfunc='sum', fill_value=0)
-            
-            # Create heatmap using seaborn and matplotlib
-            plt.figure(figsize=(12, 8))
-            sns.heatmap(pivot_monthly, annot=True, fmt='.0f', cmap='YlOrRd', cbar_kws={'label': 'Amount'})
-            plt.title('Monthly Spending Heatmap by Category')
-            plt.xlabel('Category')
-            plt.ylabel('Month')
-            plt.xticks(rotation=45)
-            plt.yticks(rotation=0)
-            plt.tight_layout()
-            st.pyplot(plt)
+            # Monthly sunburst chart of spending by month, then category
+            st.subheader("Monthly Spending Habits")
+            years_for_sunburst = sorted(df['Date'].dropna().dt.year.astype(int).unique().tolist())
+            selected_sunburst_year = st.selectbox("Select Year", years_for_sunburst, key='sunburst_year_select')
+            selected_sunburst_year = int(selected_sunburst_year)
+
+            year_df = df[df['Date'].dt.year == selected_sunburst_year].copy()
+            if year_df.empty:
+                st.warning("No spending data available for the selected year.")
+            else:
+                year_df['Month'] = year_df['Date'].dt.month_name()
+                fig_sunburst = px.treemap(
+                    year_df,
+                    path=[px.Constant(f"Spending in {selected_sunburst_year}"), 'Month', 'Category'],
+                    values='Amount',
+                    title=f"Monthly Spending Hierarchy for {selected_sunburst_year}"
+                )
+                st.plotly_chart(fig_sunburst, use_container_width=True)
+
+                # Key statistic: top spending category for the selected year
+                cat_totals = year_df.groupby('Category')['Amount'].sum()
+                if not cat_totals.empty:
+                    top_category = cat_totals.idxmax()
+                    top_amount = cat_totals.max()
+                    st.metric(
+                        label=f"Top Category in {selected_sunburst_year}",
+                        value=f"{top_category}",
+                        delta=f"₹{top_amount:,.2f}"
+                    )
             
             # 6. Month-over-Month Comparison
             st.divider()
