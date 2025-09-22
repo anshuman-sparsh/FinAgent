@@ -101,7 +101,7 @@ st.set_page_config(page_title="FinAgent", layout="wide")
 
 # Session State Initialization
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hy! I am FinAgent. Your personal financial Manager. How can I help you today?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hy! I am FinAgent. Your Personal Finance Manager. How can I help you today?"}]
 
 if 'page' not in st.session_state:
     st.session_state.page = 'Chat'
@@ -314,7 +314,7 @@ elif st.session_state.page == "Dashboard":
                         # Display metric
                         st.metric(
                             label=f"Total Spending Change ({selected_month1} → {selected_month2})",
-                            value=f"${total_month2:,.2f}",
+                            value=f"₹{total_month2:,.2f}",
                             delta=f"{pct_change:+.1f}%"
                         )
                         
@@ -339,8 +339,8 @@ elif st.session_state.page == "Dashboard":
                             
                             summary_text = f"""
                             **Category Analysis:**
-                            - **Biggest Increase:** {biggest_increase[0]} (${biggest_increase[1]:+,.2f})
-                            - **Biggest Decrease:** {biggest_decrease[0]} (${biggest_decrease[1]:+,.2f})
+                            - **Biggest Increase:** {biggest_increase[0]} (₹{biggest_increase[1]:+,.2f})
+                            - **Biggest Decrease:** {biggest_decrease[0]} (₹{biggest_decrease[1]:+,.2f})
                             """
                             st.markdown(summary_text)
                 
@@ -368,7 +368,7 @@ elif st.session_state.page == "Dashboard":
                 # Display the key metric
                 st.metric(
                     label="Average Monthly Spend",
-                    value=f"${average_monthly_spend:,.2f}",
+                    value=f"₹{average_monthly_spend:,.2f}",
                     help=f"Based on {unique_months} months of data"
                 )
                 
