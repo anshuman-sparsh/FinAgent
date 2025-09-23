@@ -8,6 +8,7 @@ import json
 import plotly.express as px
 import matplotlib.pyplot as plt
 import seaborn as sns
+import datetime
 
 # Load environment variables for local development
 load_dotenv()
@@ -209,12 +210,17 @@ elif st.session_state.page == "Dashboard":
             select_col1, select_col2 = st.columns(2)
             with select_col1:
                 kpi_years = sorted(df['Date'].dropna().dt.year.astype(int).unique().tolist())
-                selected_kpi_year = st.selectbox("Select Year", kpi_years, key='kpi_year_select')
+                today = datetime.date.today()
+                current_year = int(today.year)
+                default_kpi_year_index = kpi_years.index(current_year) if current_year in kpi_years else (len(kpi_years) - 1 if kpi_years else 0)
+                selected_kpi_year = st.selectbox("Select Year", kpi_years, index=default_kpi_year_index, key='kpi_year_select')
                 selected_kpi_year = int(selected_kpi_year)
             with select_col2:
                 all_months_kpi = ['January', 'February', 'March', 'April', 'May', 'June',
                                   'July', 'August', 'September', 'October', 'November', 'December']
-                selected_kpi_month = st.selectbox("Select Month", all_months_kpi, key='kpi_month_select')
+                current_month_name = all_months_kpi[today.month - 1] if 1 <= today.month <= 12 else None
+                default_kpi_month_index = (all_months_kpi.index(current_month_name) if current_month_name in all_months_kpi else (len(all_months_kpi) - 1 if all_months_kpi else 0))
+                selected_kpi_month = st.selectbox("Select Month", all_months_kpi, index=default_kpi_month_index, key='kpi_month_select')
                 selected_kpi_month_num = all_months_kpi.index(selected_kpi_month) + 1
             
             kpi_period_df = df[(df['Date'].dt.year == selected_kpi_year) & (df['Date'].dt.month == selected_kpi_month_num)]
@@ -237,7 +243,9 @@ elif st.session_state.page == "Dashboard":
             available_years = sorted(valid_years)
             
             # Create year selection dropdown
-            selected_year = st.selectbox("Select Year", available_years, key='line_chart_year_select')
+            current_year_line = int(datetime.date.today().year)
+            default_line_year_index = available_years.index(current_year_line) if current_year_line in available_years else (len(available_years) - 1 if available_years else 0)
+            selected_year = st.selectbox("Select Year", available_years, index=default_line_year_index, key='line_chart_year_select')
             selected_year = int(selected_year)
             
             # Filter data for the selected year
@@ -260,7 +268,8 @@ elif st.session_state.page == "Dashboard":
             # Monthly sunburst chart of spending by month, then category
             st.subheader("Monthly Spending Habits")
             years_for_sunburst = sorted(df['Date'].dropna().dt.year.astype(int).unique().tolist())
-            selected_sunburst_year = st.selectbox("Select Year", years_for_sunburst, key='sunburst_year_select')
+            default_index = years_for_sunburst.index(2025) if 2025 in years_for_sunburst else len(years_for_sunburst) - 1
+            selected_sunburst_year = st.selectbox("Select Year", years_for_sunburst, index=default_index, key='sunburst_year_select')
             selected_sunburst_year = int(selected_sunburst_year)
 
             year_df = df[df['Date'].dt.year == selected_sunburst_year].copy()
