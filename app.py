@@ -105,7 +105,7 @@ st.set_page_config(page_title="FinAgent", layout="wide")
 
 # Session State Initialization
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hy! I am FinAgent. Your Personal Finance Manager. How can I help you today?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hy! I am FinAgent. Your Personal AI Powered Finance Manager. How can I help you today?"}]
 
 if 'page' not in st.session_state:
     st.session_state.page = 'Chat'
