@@ -14,7 +14,6 @@ import datetime
 load_dotenv()
 
 # --- CONFIGURATION ---
-# These are the placeholder URLs for Amit's n8n workflows
 N8N_FILE_PROCESSING_WEBHOOK = "https://omikun.app.n8n.cloud/webhook/25e25bf7-7a4d-4016-9091-a03ac3310f0e"
 N8N_CHAT_WEBHOOK = "https://omikun.app.n8n.cloud/webhook/f9a9689e-7288-49e3-a11f-2ce9cd75c50e"
 
@@ -63,7 +62,7 @@ def get_chat_response_from_n8n(history):
         response = requests.post(N8N_CHAT_WEBHOOK, json=payload)
         response.raise_for_status()
 
-        # *** CORRECTED LOGIC STARTS HERE ***
+        
         response_data = response.json()
         
         # Check if the response is a list and is not empty
